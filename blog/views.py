@@ -42,17 +42,20 @@ def serialize_tag(tag):
 
 
 def index(request):
-    popular_posts = Post.objects.prefetch_related('author').annotate(
-        num_likes=Count('likes', distinct=True),
-        num_comments=Count('comments', distinct=True)
-    )
+    popular_posts = Post.objects.prefetch_related('author').annotate(num_likes=Count('likes'))
     most_popular_posts = popular_posts.order_by('-num_likes')[:5]
+    most_popular_posts_ids = [post.id for post in most_popular_posts]
+    most_popular_posts_with_comments = Post.objects.filter(
+        id__in=most_popular_posts_ids).annotate(num_comments=Count('comments'))
+    most_popular_posts_ids_and_num_comments = dict(
+        most_popular_posts_with_comments.values_list('id', 'num_comments'))
 
-    fresh_posts = Post.objects.prefetch_related('author').annotate(
-        num_likes=Count('likes', distinct=True),
-        num_comments=Count('comments', distinct=True)
-    ).order_by('published_at')
-    most_fresh_posts = list(fresh_posts)[-5:]
+    for post in most_popular_posts:
+        post.num_comments = most_popular_posts_ids_and_num_comments[post.id]
+
+    fresh_posts = Post.objects.prefetch_related('author').order_by(
+        '-published_at').annotate(num_comments=Count('comments'))
+    most_fresh_posts = fresh_posts[:5]
 
     popular_tags = Tag.objects.annotate(num_posts=Count('posts'))
     most_popular_tags = popular_tags.order_by('-num_posts')[:5]
